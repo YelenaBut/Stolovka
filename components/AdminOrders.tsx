@@ -15,8 +15,8 @@ type Order = {
   paid_at: string | null;
   created_at: string;
   users: {
-    name: string;
-  } | null;
+  name: string;
+  }[] | null;
   order_items: OrderItem[];
 };
 
@@ -82,7 +82,7 @@ export default function AdminOrders({ orders }: Props) {
 
               <div style={{ marginBottom: 12 }}>
                 <strong>Сотрудник:</strong>{" "}
-                {order.users?.name || "Не указан"}
+                {order.users?.[0]?.name || "Не указан"}
               </div>
 
               <div style={{ marginBottom: 12 }}>
