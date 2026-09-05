@@ -1,10 +1,49 @@
 export const dynamic = "force-dynamic";
 
-import { supabase } from "@/lib/supabase";
+import { redirect } from "next/navigation";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 import AdminBalances from "@/components/AdminBalances";
 import AdminOrders from "@/components/AdminOrders";
 
 export default async function AdminPage() {
+  const supabase = await createSupabaseServerClient();
+
+  // Проверяем авторизацию
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser();
+
+  if (!authUser) {
+    redirect("/login");
+  }
+
+  // Находим пользователя приложения
+  const { data: user, error: userError } = await supabase
+    .from("users")
+    .select("id, name, username, is_admin")
+    .eq("auth_user_id", authUser.id)
+    .single();
+
+  if (userError || !user) {
+    return (
+      <main style={{ padding: 40 }}>
+        <h1>Ошибка</h1>
+        <p>Пользователь не найден.</p>
+      </main>
+    );
+  }
+
+  // Проверяем права администратора
+  if (!user.is_admin) {
+    return (
+      <main style={{ padding: 40 }}>
+        <h1>⛔ Доступ запрещён</h1>
+        <p>У вас нет прав администратора.</p>
+      </main>
+    );
+  }
+
+  // Только после проверки admin загружаем данные админки
   const { data: balances, error: balancesError } =
     await supabase
       .from("user_balances")
@@ -20,6 +59,7 @@ export default async function AdminPage() {
         is_paid,
         paid_at,
         created_at,
+        order_date,
         users (
           name
         ),

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 export async function POST(request: Request) {
   try {
@@ -15,7 +15,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Находим пользователя по логину
+    const supabase = await createSupabaseServerClient();
+
     const { data: user, error: userError } = await supabase
       .from("users")
       .select("id, name, username, auth_user_id")
@@ -36,7 +37,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Технический email используется только внутри Supabase Auth
     const email = `${username}@stolovaya.local`;
 
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -58,7 +58,6 @@ export async function POST(request: Request) {
         name: user.name,
         username: user.username,
       },
-      session: data.session,
     });
   } catch (error) {
     console.error("LOGIN ERROR:", error);
