@@ -8,7 +8,6 @@ import AdminOrders from "@/components/AdminOrders";
 export default async function AdminPage() {
   const supabase = await createSupabaseServerClient();
 
-  // Проверяем авторизацию
   const {
     data: { user: authUser },
   } = await supabase.auth.getUser();
@@ -17,7 +16,6 @@ export default async function AdminPage() {
     redirect("/login");
   }
 
-  // Находим пользователя приложения
   const { data: user, error: userError } = await supabase
     .from("users")
     .select("id, name, username, is_admin")
@@ -33,7 +31,6 @@ export default async function AdminPage() {
     );
   }
 
-  // Проверяем права администратора
   if (!user.is_admin) {
     return (
       <main style={{ padding: 40 }}>
@@ -43,35 +40,31 @@ export default async function AdminPage() {
     );
   }
 
-  // Только после проверки admin загружаем данные админки
-  const { data: balances, error: balancesError } =
-    await supabase
-      .from("user_balances")
-      .select("*")
-      .order("name");
+  const {
+    data: balances,
+    error: balancesError,
+  } = await supabase
+    .from("user_balances")
+    .select("*")
+    .order("name");
 
-  const { data: orders, error: ordersError } =
-    await supabase
-      .from("orders")
-      .select(`
-        id,
-        total_amount,
-        is_paid,
-        paid_at,
-        created_at,
-        order_date,
-        users (
-          name
-        ),
-        order_items (
-          id,
-          item_name,
-          price,
-          quantity,
-          total
-        )
-      `)
-      .order("created_at", { ascending: false });
+  const {
+    data: orders,
+    error: ordersError,
+  } = await supabase
+    .from("orders")
+    .select(`
+      id,
+      user_id,
+      order_date,
+      meal_type,
+      price,
+      is_paid,
+      status,
+      confirmed_at
+    `)
+    .order("order_date", { ascending: true })
+    .order("id", { ascending: true });
 
   if (balancesError || ordersError) {
     return (
@@ -85,6 +78,44 @@ export default async function AdminPage() {
       </main>
     );
   }
+
+  const userIds = [
+    ...new Set(
+      (orders || []).map(
+        (order) => order.user_id
+      )
+    ),
+  ];
+
+  let usersMap: Record<number, string> = {};
+
+  if (userIds.length > 0) {
+    const { data: orderUsers } = await supabase
+      .from("users")
+      .select("id, name")
+      .in("id", userIds);
+
+    usersMap = Object.fromEntries(
+      (orderUsers || []).map((item) => [
+        item.id,
+        item.name,
+      ])
+    );
+  }
+
+  const adminOrders = (orders || []).map(
+    (order) => ({
+      id: order.id,
+      user_name:
+        usersMap[order.user_id] ||
+        "Не указан",
+      meal_type: order.meal_type,
+      price: Number(order.price || 0),
+      is_paid: order.is_paid,
+      status: order.status,
+      order_date: order.order_date,
+    })
+  );
 
   return (
     <main
@@ -100,13 +131,22 @@ export default async function AdminPage() {
         💰 Балансы сотрудников
       </h2>
 
-      <p style={{ color: "#666", marginBottom: 24 }}>
+      <p
+        style={{
+          color: "#666",
+          marginBottom: 24,
+        }}
+      >
         Здесь можно пополнять баланс сотрудников.
       </p>
 
-      <AdminBalances balances={balances || []} />
+      <AdminBalances
+        balances={balances || []}
+      />
 
-      <AdminOrders orders={orders || []} />
+      <AdminOrders
+        orders={adminOrders}
+      />
     </main>
   );
 }
